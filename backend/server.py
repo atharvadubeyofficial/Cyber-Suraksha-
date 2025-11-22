@@ -114,16 +114,19 @@ class VulnerabilityScore(BaseModel):
 
 # ===================== ROUTES =====================
 
-@api_router.get("/")
-async def root():
-    return {"message": "Cybersecurity Simulator API"}
+from fastapi import FastAPI
 
+app = FastAPI()
 
-@api_router.get("/health")
-async def health():
-    return {"status": "OK"}
+# Health Check Route
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
 
-
+# Root Check (Optional)
+@app.get("/api")
+def root():
+    return {"message": "Backend running!"}
 
 # ---------- USER CREATION ----------
 @api_router.post("/users", response_model=User)
