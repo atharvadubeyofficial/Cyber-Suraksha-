@@ -6,41 +6,46 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+from typing import List
 import uuid
 from datetime import datetime, timezone
 from io import BytesIO
 from fastapi.responses import StreamingResponse
 import random
 
-# NEW: OpenAI official SDK
+# OpenAI SDK
 from openai import AsyncOpenAI
 
-# PDF Generation
+# PDF tools
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 
+# Load environment variables
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
-# ======== DATABASE CONNECTION ========
+# --- ROUTER ---
+api_router = APIRouter()   # << FIXED (You forgot this earlier)
+
+# --- DATABASE ---
 mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
 
-# ======== AI CLIENT ========
+# --- OpenAI ---
 openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 AI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 
-# ======== FASTAPI ========
+
+# --- FASTAPI APP ---
 app = FastAPI()
-app.include_router(api_router, prefix="/api")
 
 
 # ===================== MODELS =====================
+
 class User(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -114,21 +119,18 @@ class VulnerabilityScore(BaseModel):
 
 # ===================== ROUTES =====================
 
-from fastapi import FastAPI
+@api_router.get("/")
+async def root():
+    return {"message": "Cybersecurity Simulator API"}
 
-app = FastAPI()
 
-# Health Check Route
-@app.get("/api/health")
-def health():
-    return {"status": "ok"}
+@api_router.get("/health")
+async def health():
+    return {"status": "OK"}
 
-# Root Check (Optional)
-@app.get("/api")
-def root():
-    return {"message": "Backend running!"}
 
-# ---------- USER CREATION ----------
+# ===================== USERS =====================
+
 @api_router.post("/users", response_model=User)
 async def create_user(input: UserCreate):
     existing_user = await db.users.find_one({"email": input.email}, {"_id": 0})
@@ -149,19 +151,25 @@ async def get_user(user_id: str):
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
     if isinstance(user["created_at"], str):
         user["created_at"] = datetime.fromisoformat(user["created_at"])
+
     return user
 
 
-# ---------- SIMULATION ----------
+# ===================== SIMULATIONS =====================
+
 @api_router.post("/simulations", response_model=SimulationAttempt)
 async def create_simulation(input: SimulationAttemptCreate):
+
     attempt = SimulationAttempt(**input.model_dump())
     doc = attempt.model_dump()
     doc["timestamp"] = doc["timestamp"].isoformat()
+
     await db.simulations.insert_one(doc)
 
+    # Update user total score
     user = await db.users.find_one({"id": input.user_id}, {"_id": 0})
     if user:
         new_total = user.get("total_score", 0) + input.score
@@ -172,7 +180,7 @@ async def create_simulation(input: SimulationAttemptCreate):
 
         await db.users.update_one(
             {"id": input.user_id},
-            {"$set": {"total_score": new_total, "completed_simulations": completed}},
+            {"$set": {"total_score": new_total, "completed_simulations": completed}}
         )
 
     await update_vulnerability_score(input.user_id, input.simulation_type, input.score)
@@ -183,22 +191,22 @@ async def create_simulation(input: SimulationAttemptCreate):
 @api_router.get("/simulations/user/{user_id}", response_model=List[SimulationAttempt])
 async def get_user_simulations(user_id: str):
     simulations = await db.simulations.find({"user_id": user_id}, {"_id": 0}).to_list(1000)
+
     for sim in simulations:
         if isinstance(sim["timestamp"], str):
             sim["timestamp"] = datetime.fromisoformat(sim["timestamp"])
+
     return simulations
 
 
-# ---------- AI CHATBOT (OpenAI Version) ----------
+# ===================== CHATBOT =====================
+
 @api_router.post("/chat")
 async def chat_with_ai(request: ChatRequest):
     try:
         system_prompt = """
         You are CYBER SURAKSHA OPS Assistant — a simple, friendly cybersecurity educator for MSMEs.
-        - Explain concepts in simple Hindi + English (Hinglish)
-        - Give practical steps, no technical jargon
-        - Help users understand their mistakes and improve
-        - Do NOT generate hacking instructions
+        Explain in Hinglish. No hacking instructions.
         """
 
         completion = await openai_client.chat.completions.create(
@@ -211,11 +219,13 @@ async def chat_with_ai(request: ChatRequest):
 
         response_text = completion.choices[0].message["content"]
 
+        # save chat
         chat_doc = ChatMessage(
             session_id=request.session_id,
             user_message=request.message,
             ai_response=response_text,
         )
+
         doc = chat_doc.model_dump()
         doc["timestamp"] = doc["timestamp"].isoformat()
         await db.chat_history.insert_one(doc)
@@ -239,7 +249,8 @@ async def get_chat_history(session_id: str):
     return messages
 
 
-# ---------- VULNERABILITY SCORE ----------
+# ===================== SCORES =====================
+
 async def update_vulnerability_score(user_id: str, simulation_type: str, score: int):
     field_map = {
         "phishing": "phishing_score",
@@ -253,29 +264,30 @@ async def update_vulnerability_score(user_id: str, simulation_type: str, score: 
     existing = await db.vulnerability_scores.find_one({"user_id": user_id}, {"_id": 0})
 
     if existing:
+        # update field
         if simulation_type in field_map:
             field = field_map[simulation_type]
 
             await db.vulnerability_scores.update_one(
                 {"user_id": user_id},
-                {"$set": {field: score, "last_updated": datetime.now(timezone.utc).isoformat()}},
+                {"$set": {field: score, "last_updated": datetime.now(timezone.utc).isoformat()}}
             )
 
         updated = await db.vulnerability_scores.find_one({"user_id": user_id}, {"_id": 0})
+
         scores = [
             updated.get("phishing_score", 0),
             updated.get("password_score", 0),
             updated.get("malware_score", 0),
             updated.get("sql_injection_score", 0),
             updated.get("ransomware_score", 0),
-            updated.get("social_engineering_score", 0),
+            updated.get("social_engineering_score", 0)
         ]
 
-        overall = (
-            sum(scores) // len([s for s in scores if s > 0])
-            if any(s > 0 for s in scores)
-            else 0
-        )
+        if any(s > 0 for s in scores):
+            overall = sum(scores) // len([s for s in scores if s > 0])
+        else:
+            overall = 0
 
         await db.vulnerability_scores.update_one(
             {"user_id": user_id}, {"$set": {"overall_score": overall}}
@@ -294,6 +306,7 @@ async def update_vulnerability_score(user_id: str, simulation_type: str, score: 
 @api_router.get("/vulnerability-score/{user_id}")
 async def get_vulnerability_score(user_id: str):
     score = await db.vulnerability_scores.find_one({"user_id": user_id}, {"_id": 0})
+
     if not score:
         return {
             "user_id": user_id,
@@ -313,7 +326,8 @@ async def get_vulnerability_score(user_id: str):
     return score
 
 
-# ---------- REPORT GENERATION ----------
+# ===================== REPORT =====================
+
 @api_router.get("/report/{user_id}")
 async def generate_report(user_id: str):
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
@@ -325,6 +339,7 @@ async def generate_report(user_id: str):
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
+
     story = []
     styles = getSampleStyleSheet()
 
@@ -347,25 +362,27 @@ async def generate_report(user_id: str):
     ))
     story.append(Spacer(1, 0.3 * inch))
 
+    # SCORE TABLE
     if vuln_score:
+
         overall = vuln_score.get("overall_score", 0)
         story.append(Paragraph(f"<b>Overall Security Score: {overall}/100</b>", styles["Heading2"]))
         story.append(Spacer(1, 0.2 * inch))
 
         score_data = [
             ["Threat Type", "Score", "Status"],
-            ["Phishing Detection", f"{vuln_score.get('phishing_score', 0)}/100",
+            ["Phishing", f"{vuln_score.get('phishing_score', 0)}/100",
              get_status(vuln_score.get('phishing_score', 0))],
-            ["Password Security", f"{vuln_score.get('password_score', 0)}/100",
+            ["Password", f"{vuln_score.get('password_score', 0)}/100",
              get_status(vuln_score.get('password_score', 0))],
-            ["Malware Awareness", f"{vuln_score.get('malware_score', 0)}/100",
+            ["Malware", f"{vuln_score.get('malware_score', 0)}/100",
              get_status(vuln_score.get('malware_score', 0))],
             ["SQL Injection", f"{vuln_score.get('sql_injection_score', 0)}/100",
              get_status(vuln_score.get('sql_injection_score', 0))],
-            ["Ransomware Defense", f"{vuln_score.get('ransomware_score', 0)}/100",
+            ["Ransomware", f"{vuln_score.get('ransomware_score', 0)}/100",
              get_status(vuln_score.get('ransomware_score', 0))],
             ["Social Engineering", f"{vuln_score.get('social_engineering_score', 0)}/100",
-             get_status(vuln_score.get('social_engineering_score', 0))],
+             get_status(vuln_score.get('social_engineering_score', 0))]
         ]
 
         table = Table(score_data)
@@ -379,15 +396,16 @@ async def generate_report(user_id: str):
             ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
             ("GRID", (0, 0), (-1, -1), 1, colors.black),
         ]))
+
         story.append(table)
 
     story.append(Spacer(1, 0.3 * inch))
     story.append(Paragraph("<b>Recommendations:</b>", styles["Heading2"]))
-    story.append(Paragraph("1. Enable Two-Factor Authentication (2FA) on all business accounts", styles["Normal"]))
-    story.append(Paragraph("2. Conduct regular cybersecurity training for staff", styles["Normal"]))
-    story.append(Paragraph("3. Maintain strong unique passwords with a password manager", styles["Normal"]))
-    story.append(Paragraph("4. Keep all systems updated", styles["Normal"]))
-    story.append(Paragraph("5. Maintain regular data backups", styles["Normal"]))
+    story.append(Paragraph("1. Enable Two-Factor Authentication (2FA)", styles["Normal"]))
+    story.append(Paragraph("2. Conduct regular cybersecurity training", styles["Normal"]))
+    story.append(Paragraph("3. Use strong unique passwords", styles["Normal"]))
+    story.append(Paragraph("4. Keep systems updated", styles["Normal"]))
+    story.append(Paragraph("5. Maintain regular backups", styles["Normal"]))
 
     doc.build(story)
     buffer.seek(0)
@@ -400,19 +418,17 @@ async def generate_report(user_id: str):
 
 
 def get_status(score):
-    if score >= 80:
-        return "Excellent"
-    elif score >= 60:
-        return "Good"
-    elif score >= 40:
-        return "Fair"
-    else:
-        return "Needs Improvement"
+    if score >= 80: return "Excellent"
+    if score >= 60: return "Good"
+    if score >= 40: return "Fair"
+    return "Needs Improvement"
 
 
-# ---------- CERTIFICATE ----------
+# ===================== CERTIFICATE =====================
+
 @api_router.post("/certificate/{user_id}")
 async def issue_certificate(user_id: str):
+
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -421,6 +437,7 @@ async def issue_certificate(user_id: str):
         raise HTTPException(status_code=400, detail="Complete all simulations to earn certificate")
 
     existing_cert = await db.certificates.find_one({"user_id": user_id}, {"_id": 0})
+
     if existing_cert:
         if isinstance(existing_cert["issued_date"], str):
             existing_cert["issued_date"] = datetime.fromisoformat(existing_cert["issued_date"])
@@ -430,9 +447,12 @@ async def issue_certificate(user_id: str):
         user_id=user_id,
         certificate_number=f"CYBER-{random.randint(10000, 99999)}"
     )
+
     doc = cert.model_dump()
     doc["issued_date"] = doc["issued_date"].isoformat()
+
     await db.certificates.insert_one(doc)
+
     return cert
 
 
@@ -448,8 +468,9 @@ async def get_certificate(user_id: str):
     return cert
 
 
-# --------- CORS + ROUTER ---------
-app.include_router(api_router, prefix="/api")
+# ===================== ADD ROUTER + CORS =====================
+
+app.include_router(api_router, prefix="/api")  # ONLY ONCE — fixed
 
 app.add_middleware(
     CORSMiddleware,
@@ -459,13 +480,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
 
+# ===================== SHUTDOWN =====================
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+
+# ===================== LOGGING =====================
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+logger = logging.getLogger(__name__)
