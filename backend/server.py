@@ -117,7 +117,9 @@ class VulnerabilityScore(BaseModel):
 @api_router.get("/")
 async def root():
     return {"message": "Cybersecurity Simulator API"}
-    @api_router.get("/health")
+
+
+@api_router.get("/health")
 async def health():
     return {"status": "OK"}
 
