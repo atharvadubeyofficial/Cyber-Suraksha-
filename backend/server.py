@@ -446,7 +446,7 @@ async def get_certificate(user_id: str):
 
 
 # --------- CORS + ROUTER ---------
-app.include_router(api_router, prefix="/api")
+app.include_router(router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
