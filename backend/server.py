@@ -37,7 +37,7 @@ AI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 
 # ======== FASTAPI ========
 app = FastAPI()
-api_router = APIRouter()
+app.include_router(api_router, prefix="/api")
 
 
 # ===================== MODELS =====================
