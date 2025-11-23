@@ -1,3 +1,4 @@
+import React from "react";
 export function Progress({ value }) {
   return (
     <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
