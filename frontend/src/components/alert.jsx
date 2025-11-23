@@ -1,3 +1,4 @@
+import React from "react";
 export function Alert({ title, description, className = "" }) {
   return (
     <div className={`border-l-4 border-blue-600 bg-blue-50 p-4 rounded-md ${className}`}>
