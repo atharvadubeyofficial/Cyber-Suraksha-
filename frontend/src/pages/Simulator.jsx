@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { Button } from "../components/ui/button";
-import { Progress } from "../components/ui/progress";
+import { Button } from "../components/button";
+import { Progress } from "../components/progress";
 import {
   AlertTriangle,
   ArrowLeft,
