@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Progress } from '../components/ui/progress';
+import { Button } from '../components/button';
+import { Input } from '../components/input';
+import { Progress } from '../components/progress';
 import { Shield, AlertTriangle, CheckCircle, Key } from 'lucide-react';
 
 export default function WeakPasswordSimulation({ onComplete }) {
