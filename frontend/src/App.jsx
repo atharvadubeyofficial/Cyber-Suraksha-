@@ -1,3 +1,4 @@
+import React from "react";
 import { useState, useEffect } from "react";
 import "./App.css"; // FIXED for Vercel builds
 import { BrowserRouter, Routes, Route } from "react-router-dom";
