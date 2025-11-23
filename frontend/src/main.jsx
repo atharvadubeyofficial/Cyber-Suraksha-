@@ -1,7 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App.jsx";  // <-- change .js to .jsx
-import "./App.css";              // IMPORTANT: exact file name
+import App from "./App.js";     // YES this is correct
+import "./index.css";
+import "./App.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
