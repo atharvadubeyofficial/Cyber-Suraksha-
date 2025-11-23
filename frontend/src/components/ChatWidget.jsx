@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
+import { Button } from './button';
+import { Input } from './input';
 import { MessageCircle, X, Send, Bot } from 'lucide-react';
 import axios from 'axios';
 
