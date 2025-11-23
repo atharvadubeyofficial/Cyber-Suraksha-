@@ -1,3 +1,4 @@
+import React from "react";
 export function Avatar({ src, name }) {
   return (
     <div className="flex items-center space-x-3">
