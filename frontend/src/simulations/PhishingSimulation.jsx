@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '../components/ui/button';
+import { Button } from '../components/button';
 import { AlertTriangle, CheckCircle, Mail, ExternalLink, Paperclip } from 'lucide-react';
 
 export default function PhishingSimulation({ onComplete }) {
