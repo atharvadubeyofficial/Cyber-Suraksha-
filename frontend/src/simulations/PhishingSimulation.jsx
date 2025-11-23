@@ -1,3 +1,4 @@
+import React from "react";
 import { useState } from 'react';
 import { Button } from '../components/button';
 import { AlertTriangle, CheckCircle, Mail, ExternalLink, Paperclip } from 'lucide-react';
