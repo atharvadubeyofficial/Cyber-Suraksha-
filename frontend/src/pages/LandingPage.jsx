@@ -7,7 +7,7 @@ import { Input } from "../components/input";
 import { Shield, Lock, AlertTriangle, Eye, Database, Users } from "lucide-react";
 import { toast } from "sonner";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 export default function LandingPage({ setUser }) {
