@@ -6,3 +6,5 @@ motor
 reportlab
 openai
 starlette
+cors
+pymongo
