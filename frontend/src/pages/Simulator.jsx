@@ -20,7 +20,7 @@ import RansomwareSimulation from "../simulations/RansomwareSimulation";
 import SocialEngineeringSimulation from "../simulations/SocialEngineeringSimulation";
 
 // Vercel-compatible env
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 const simulationComponents = {
