@@ -116,6 +116,60 @@ class VulnerabilityScore(BaseModel):
     social_engineering_score: int = 0
     last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+# ===================== SIMULATION HANDLERS (MISSING FIX) =====================
+
+# Common simulation response generator
+def generate_simulation_result():
+    score = random.randint(60, 95)
+    passed = score >= 75
+    duration = random.randint(40, 120)
+
+    return {
+        "score": score,
+        "passed": passed,
+        "duration_seconds": duration,
+        "answers": {"auto": "Simulated result"}
+    }
+
+
+@api_router.post("/simulate/phishing")
+async def simulate_phishing():
+    return {
+        "simulation_type": "phishing",
+        **generate_simulation_result()
+    }
+
+
+@api_router.post("/simulate/weak-password")
+async def simulate_weak_password():
+    return {
+        "simulation_type": "weak_password",
+        **generate_simulation_result()
+    }
+
+
+@api_router.post("/simulate/malware")
+async def simulate_malware():
+    return {
+        "simulation_type": "malware",
+        **generate_simulation_result()
+    }
+
+
+@api_router.post("/simulate/ransomware")
+async def simulate_ransomware():
+    return {
+        "simulation_type": "ransomware",
+        **generate_simulation_result()
+    }
+
+
+@api_router.post("/simulate/social-engineering")
+async def simulate_social_engineering():
+    return {
+        "simulation_type": "social_engineering",
+        **generate_simulation_result()
+    }
 
 # ===================== ROUTES =====================
 
