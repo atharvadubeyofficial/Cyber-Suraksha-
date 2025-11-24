@@ -19,7 +19,7 @@ import {
 import { toast } from "sonner";
 
 // VERCEL-FRIENDLY ENV FIX
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 const simulationTypes = [
